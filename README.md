@@ -28,7 +28,8 @@ Once opened, the app works offline.
 | `index.html` | The whole app: interface, solar calculations and place data |
 | `manifest.webmanifest` | Home-screen name, icon and display settings |
 | `sw.js` | Service worker that caches the app for offline use |
-| `icon-*.png` | App icons |
+| `icon-*.png` | App icons: dark version for the home screen and dark mode |
+| `icon-light-*.png` | Light version of the icon, used as the browser tab icon in light mode |
 
 ## Data
 

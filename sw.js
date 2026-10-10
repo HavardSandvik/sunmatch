@@ -1,6 +1,6 @@
 // Offline support: the page loads network-first; other files are served from cache and refreshed in the background.
-const CACHE = 'sunmatch-v3';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
+const CACHE = 'sunmatch-v4';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png', './icon-32.png', './icon-light-32.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
