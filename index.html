@@ -40,7 +40,9 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
 main{max-width:560px;margin:0 auto;padding:20px 20px 40px}
 .display{font-family:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif}
-h1{font-weight:500;font-size:17px;line-height:1;margin:6px 0 30px;color:var(--muted)}
+.masthead{margin:4px 0 28px}
+h1{font-weight:700;font-size:27px;line-height:1.1;letter-spacing:-.015em;margin:0;color:var(--ink)}
+.tagline{margin:6px 0 0;color:var(--muted);font-size:16px;line-height:1.4;max-width:36ch}
 .lead{margin:0;font-size:19px;max-width:32ch}
 .big{font-weight:700;font-size:clamp(76px,26vw,140px);line-height:.95;letter-spacing:-.045em;margin:8px 0 6px;font-variant-numeric:tabular-nums}
 .alt{margin:0;color:var(--muted);font-size:18px}
@@ -77,7 +79,10 @@ button{font:inherit;font-weight:700;font-size:16px;background:var(--ink);color:v
 </head>
 <body>
 <main>
-  <h1 class="display">Sun match</h1>
+  <header class="masthead">
+    <h1 class="display">Sun match</h1>
+    <p class="tagline" id="tagline">How strong is the sun? Compare it with a place and date you know.</p>
+  </header>
 
   <section aria-live="polite">
     <p class="lead" id="lead">Finding the sun…</p>
@@ -196,6 +201,9 @@ const state={benchId:'London|GB',benchDate:new Date().getFullYear()+'-06-20',her
 try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');if(placeById(s.benchId||''))state.benchId=s.benchId;if(/^\d{4}-\d{2}-\d{2}$/.test(s.benchDate||''))state.benchDate=s.benchDate;if(s.hereId==='gps'||placeById(s.hereId||''))state.hereId=s.hereId}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify({benchId:state.benchId,benchDate:state.benchDate,hereId:state.hereId}))}catch(e){}}
 let gps=null,locating=false;
+// The tagline shows until a comparison has been displayed once; from the next visit on it stays hidden.
+let introSeen=false;try{introSeen=localStorage.getItem(KEY+':intro')==='1'}catch(err){}
+if(introSeen)$('tagline').hidden=true;
 
 function hereSpot(){
   if(state.hereId==='gps')return gps?{name:'Here',lat:gps.lat,lon:gps.lon,tz:DEV_TZ}:null;
@@ -265,6 +273,7 @@ function render(){
   let primary=null;
 
   $('stats').hidden=false;
+  if(!introSeen){introSeen=true;try{localStorage.setItem(KEY+':intro','1')}catch(err){}}
   const hereLabel=gpsMode?'where you are':`in ${here.name}`;
   $('sHereLabel').textContent=`Sun height ${hereLabel}`;
   $('uHereLabel').textContent=`UV ${hereLabel}`;
