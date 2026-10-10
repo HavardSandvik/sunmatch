@@ -20,7 +20,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#DCE8F2;--surface:#FFFFFF;--ink:#14213D;--muted:#55657A;--line:#2F6AA8;--sun:#D9830B;--grid:#D3DFEA;--field:#F1F6FA;
+  --bg:#DCE8F2;--surface:#FFFFFF;--ink:#14213D;--muted:#55657A;--line:#2F6AA8;--sun:#D9830B;--grid:#D3DFEA;--field:#F1F6FA;--mark-sun:#F2A516;
   color-scheme:light;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
@@ -28,12 +28,12 @@
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#0D1524;--surface:#162136;--ink:#E7EEF6;--muted:#9AA9BC;--line:#78AEE6;--sun:#FFB840;--grid:#26344C;--field:#1D2A42;
+    --bg:#0D1524;--surface:#162136;--ink:#E7EEF6;--muted:#9AA9BC;--line:#78AEE6;--sun:#FFB840;--grid:#26344C;--field:#1D2A42;--mark-sun:#FFB840;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0D1524;--surface:#162136;--ink:#E7EEF6;--muted:#9AA9BC;--line:#78AEE6;--sun:#FFB840;--grid:#26344C;--field:#1D2A42;
+  --bg:#0D1524;--surface:#162136;--ink:#E7EEF6;--muted:#9AA9BC;--line:#78AEE6;--sun:#FFB840;--grid:#26344C;--field:#1D2A42;--mark-sun:#FFB840;
   color-scheme:dark;
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -42,7 +42,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 "Atkinson Hype
 main{max-width:560px;margin:0 auto;padding:20px 20px 40px}
 .display{font-family:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif}
 .masthead{margin:4px 0 28px}
-h1{font-weight:700;font-size:27px;line-height:1.1;letter-spacing:-.015em;margin:0;color:var(--ink)}
+h1{font-weight:700;font-size:27px;line-height:1.1;letter-spacing:-.015em;margin:0;color:var(--ink);display:flex;align-items:center;gap:10px}
+.mark{flex:none;width:52px;height:24px;display:block}
 .tagline{margin:6px 0 0;color:var(--muted);font-size:16px;line-height:1.4;max-width:36ch}
 .lead{margin:0;font-size:19px;max-width:32ch}
 .big{font-weight:700;font-size:clamp(76px,26vw,140px);line-height:.95;letter-spacing:-.045em;margin:8px 0 6px;font-variant-numeric:tabular-nums}
@@ -81,7 +82,7 @@ button{font:inherit;font-weight:700;font-size:16px;background:var(--ink);color:v
 <body>
 <main>
   <header class="masthead">
-    <h1 class="display">Sun match</h1>
+    <h1 class="display"><svg class="mark" viewBox="0 0 52 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="var(--mark-sun)"/><circle cx="40" cy="12" r="9" fill="var(--mark-sun)"/><line x1="1" y1="12" x2="51" y2="12" stroke="var(--ink)" stroke-width="2" stroke-dasharray="3.5 2.5"/></svg>Sun match</h1>
     <p class="tagline" id="tagline">How strong is the sun? Compare it with a place and date you know.</p>
   </header>
 
