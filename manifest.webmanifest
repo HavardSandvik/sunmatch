@@ -1,6 +1,6 @@
 {
-  "name": "Sun match",
-  "short_name": "Sun match",
+  "name": "sunmatch",
+  "short_name": "sunmatch",
   "description": "Compare how strong the sun is where you are with a place and date you know.",
   "start_url": "./",
   "scope": "./",

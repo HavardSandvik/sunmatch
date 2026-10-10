@@ -1,6 +1,6 @@
-# Sun match
+# sunmatch
 
-Sun match tells you how strong the sun is where you are, in terms of a place and date you already know.
+sunmatch tells you how strong the sun is where you are, in terms of a place and date you already know.
 
 For example, 16:00 in Gran Canaria on 21 December matches London on 20 June at about 18:33, or 07:32 in the morning.
 
