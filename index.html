@@ -82,8 +82,7 @@ details.conditions summary::-webkit-details-marker{display:none}
 details.conditions summary::before{content:"";flex:none;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
 details.conditions[open] summary::before{transform:rotate(45deg)}
 .cond-state{font-weight:400;color:var(--muted);font-size:15px}
-label.check{flex-direction:row;align-items:center;align-self:end;gap:10px;font-size:16px;color:var(--ink);min-height:44px;cursor:pointer}
-label.check input{width:22px;height:22px;min-height:0;padding:0;margin:0;accent-color:var(--sun);flex:none}
+.stack{display:grid;gap:14px;max-width:340px}
 .hint{font-size:14px;color:var(--muted);margin:8px 0 4px;max-width:46ch}
 .adj{margin:14px 0 0;font-size:18px;line-height:1.4;max-width:34ch}
 .adj strong{font-variant-numeric:tabular-nums}
@@ -127,12 +126,19 @@ label.check input{width:22px;height:22px;min-height:0;padding:0;margin:0;accent-
   </div>
   <label id="pickWrap" hidden>Local date and time<input type="datetime-local" id="pick"></label>
   <details class="conditions" id="conditions">
-    <summary>Altitude and snow <span class="cond-state" id="condState">Off</span></summary>
-    <div class="row">
-      <label>Altitude in metres<input type="number" id="altInput" inputmode="numeric" min="0" max="9000" step="10" placeholder="Sea level"></label>
-      <label class="check"><input type="checkbox" id="snowInput">Snow on the ground</label>
+    <summary>Altitude and surroundings <span class="cond-state" id="condState">Off</span></summary>
+    <div class="stack">
+      <div>
+        <label>Altitude in metres<input type="number" id="altInput" inputmode="numeric" min="0" max="9000" step="10" placeholder="Sea level"></label>
+        <p class="hint" id="altHint"></p>
+      </div>
+      <label>Surroundings<select id="surfaceInput">
+        <option value="none">Grass, soil or town</option>
+        <option value="water">Water</option>
+        <option value="sand">Sand or beach</option>
+        <option value="snow">Fresh snow</option>
+      </select></label>
     </div>
-    <p class="hint" id="altHint"></p>
   </details>
 
   <h2 class="display">Compare with</h2>
@@ -141,7 +147,7 @@ label.check input{width:22px;height:22px;min-height:0;padding:0;margin:0;accent-
     <label>Date<input type="date" id="benchDate"></label>
   </div>
 
-  <p class="note">Matches the sun's height above the horizon, which drives UV strength. The UV figures are clear-sky estimates at sea level with typical ozone; cloud and haze lower the real value. Altitude adds about 10% per 1,000 m, and fresh snow can raise exposure by about half again through reflection. Both adjustments are estimates.</p>
+  <p class="note">Matches the sun's height above the horizon, which drives UV strength. The UV figures are clear-sky estimates at sea level with typical ozone; cloud and haze lower the real value. Altitude adds about 10% per 1,000 m. Reflection adds about 10% near water, 15% on sand and around half again on fresh snow. These adjustments are estimates.</p>
   <p class="note" style="margin-top:12px">Place data © <a href="https://www.geonames.org/" style="color:inherit">GeoNames</a>, <a href="https://creativecommons.org/licenses/by/4.0/" style="color:inherit">CC BY 4.0</a>, filtered and adapted.</p>
 </main>
 
@@ -221,9 +227,16 @@ function crossings(pts,t){
 
 /* state */
 const KEY='sunmatch:v2';
-const state={benchId:'London|GB',benchDate:new Date().getFullYear()+'-06-20',hereId:'gps',now:true,altManual:'',snow:false};
-try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');if(placeById(s.benchId||''))state.benchId=s.benchId;if(/^\d{4}-\d{2}-\d{2}$/.test(s.benchDate||''))state.benchDate=s.benchDate;if(s.hereId==='gps'||placeById(s.hereId||''))state.hereId=s.hereId;if(typeof s.altManual==='string'&&/^\d{0,4}(\.\d+)?$/.test(s.altManual))state.altManual=s.altManual;state.snow=s.snow===true}catch(e){}
-function save(){try{localStorage.setItem(KEY,JSON.stringify({benchId:state.benchId,benchDate:state.benchDate,hereId:state.hereId,altManual:state.altManual,snow:state.snow}))}catch(e){}}
+// Reflection from the surroundings: multiplier on exposure, and wording
+const SURFACES={
+  none:{f:1,on:'',short:''},
+  water:{f:1.10,on:'by water',short:'water'},
+  sand:{f:1.15,on:'on sand',short:'sand'},
+  snow:{f:1.5,on:'on snow',short:'snow'}
+};
+const state={benchId:'London|GB',benchDate:new Date().getFullYear()+'-06-20',hereId:'gps',now:true,altManual:'',surface:'none'};
+try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');if(placeById(s.benchId||''))state.benchId=s.benchId;if(/^\d{4}-\d{2}-\d{2}$/.test(s.benchDate||''))state.benchDate=s.benchDate;if(s.hereId==='gps'||placeById(s.hereId||''))state.hereId=s.hereId;if(typeof s.altManual==='string'&&/^\d{0,4}(\.\d+)?$/.test(s.altManual))state.altManual=s.altManual;if(SURFACES[s.surface])state.surface=s.surface;else if(s.snow===true)state.surface='snow'}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({benchId:state.benchId,benchDate:state.benchDate,hereId:state.hereId,altManual:state.altManual,surface:state.surface}))}catch(e){}}
 let gps=null,locating=false;
 // The tagline shows until a comparison has been displayed once; from the next visit on it stays hidden.
 let introSeen=false;try{introSeen=localStorage.getItem(KEY+':intro')==='1'}catch(err){}
@@ -242,7 +255,6 @@ function hereInstant(here){
 
 /* conditions: altitude and snow */
 const ALT_PER_KM=0.10;   // UV rises roughly 10% per 1,000 m (WHO)
-const SNOW_FACTOR=1.5;   // fresh snow: effective exposure up by about half through reflection
 const ALT_MIN=500;       // below this the altitude effect is negligible and ignored
 function conditions(){
   let alt=null,src='';
@@ -250,13 +262,16 @@ function conditions(){
   if(state.altManual!==''&&isFinite(m)){alt=Math.max(0,Math.min(9000,m));src='manual'}
   else if(state.hereId==='gps'&&gps&&gps.alt!=null&&isFinite(gps.alt)){alt=Math.max(0,gps.alt);src='gps'}
   const altOn=alt!=null&&alt>=ALT_MIN;
-  const factor=(altOn?1+ALT_PER_KM*alt/1000:1)*(state.snow?SNOW_FACTOR:1);
-  const altTxt=alt==null?'':`${(Math.round(alt/10)*10).toLocaleString('en-GB')} m`;
+  const sf=SURFACES[state.surface]||SURFACES.none,surfOn=sf.f>1;
+  const factor=(altOn?1+ALT_PER_KM*alt/1000:1)*sf.f;
+  const altTxt=alt==null?'':`${Math.round(alt).toLocaleString('en-GB')} m`;
+  const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
   let phrase='',short='Off';
-  if(altOn&&state.snow){phrase=`At ${altTxt} with snow`;short=`${altTxt}, snow`}
+  if(altOn&&surfOn){phrase=`At ${altTxt} ${sf.on}`;short=`${altTxt}, ${sf.short}`}
   else if(altOn){phrase=`At ${altTxt}`;short=altTxt}
-  else if(state.snow){phrase='With snow';short='Snow'}
-  return {alt,src,altOn,altTxt,factor,active:altOn||state.snow,phrase,short};
+  else if(surfOn){phrase=cap(sf.on);short=cap(sf.short)}
+  const what=altOn&&surfOn?'altitude and surroundings':altOn?'altitude':sf.short;
+  return {alt,src,altOn,surfOn,altTxt,factor,active:altOn||surfOn,phrase,short,what};
 }
 // Sun height that gives this clear-sky UV at sea level (inverse of uvi)
 function heightForUv(u){return u>=12.5?90:Math.asin(Math.pow(u/12.5,1/2.42))/R}
@@ -264,15 +279,15 @@ function updateConditionsUI(c){
   $('condState').textContent=c.short;
   const inp=$('altInput');
   if(document.activeElement!==inp&&inp.value!==state.altManual)inp.value=state.altManual;
-  $('snowInput').checked=state.snow;
+  $('surfaceInput').value=state.surface;
   const gpsAlt=state.hereId==='gps'&&gps&&gps.alt!=null&&isFinite(gps.alt);
   inp.placeholder=gpsAlt?`${Math.round(gps.alt).toLocaleString('en-GB')} from phone`:'Sea level';
   let h;
-  if(c.src==='gps')h=`Using your phone's altitude. Type a value to override it.`;
+  if(c.src==='gps')h=c.altOn?`Using your phone's altitude. Type a value to override it.`:`Your phone reports ${c.altTxt}, too low to make a difference.`;
   else if(c.src==='manual')h='';
   else if(state.hereId==='gps')h=gps?`Your phone hasn't reported an altitude. Enter one to adjust.`:'';
   else h='Enter the altitude of where you are.';
-  if(c.alt!=null&&!c.altOn)h=`Below ${ALT_MIN} m the effect is negligible, so altitude isn't adjusted.`;
+  if(c.src==='manual'&&!c.altOn)h=`Below ${ALT_MIN} m the effect is negligible, so altitude isn't adjusted.`;
   $('altHint').textContent=h;$('altHint').hidden=!h;
 }
 
@@ -378,7 +393,7 @@ function render(){
   }
   $('chart').innerHTML=chartSvg(bpts,hpts,e>0?e:null,crosses,primary,e>0?nowMin:null,adj);
   const hereDay=state.now?'today':fmtDate(hp.year,hp.month,hp.day);
-  $('legend').innerHTML=`<span><i class="key"></i>${bName}</span><span><i class="key here"></i>${gpsMode?'Your location':here.name}, ${hereDay}</span>`+(e>0?`<span><i class="key target"></i>${state.now?'Sun height now':'Sun height at chosen time'}</span>`:'')+(adj?`<span><i class="key adjusted"></i>Adjusted for ${cond.altOn&&state.snow?'altitude and snow':cond.altOn?'altitude':'snow'}</span>`:'');
+  $('legend').innerHTML=`<span><i class="key"></i>${bName}</span><span><i class="key here"></i>${gpsMode?'Your location':here.name}, ${hereDay}</span>`+(e>0?`<span><i class="key target"></i>${state.now?'Sun height now':'Sun height at chosen time'}</span>`:'')+(adj?`<span><i class="key adjusted"></i>Adjusted for ${cond.what}</span>`:'');
 }
 
 /* location */
@@ -431,8 +446,8 @@ function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;
 makeCombo($('benchInput'),$('benchList'),false,()=>state.benchId,id=>{state.benchId=id;save();render()});
 makeCombo($('hereInput'),$('hereList'),true,()=>state.hereId,id=>{if(id!==state.hereId)state.altManual='';state.hereId=id;save();if(id==='gps'&&!gps)locate();render()});
 $('altInput').addEventListener('input',e=>{state.altManual=e.target.value.trim();save();render()});
-$('snowInput').addEventListener('change',e=>{state.snow=e.target.checked;save();render()});
-if(state.snow||state.altManual!=='')$('conditions').open=true;
+$('surfaceInput').addEventListener('change',e=>{state.surface=e.target.value;save();render()});
+if(state.surface!=='none'||state.altManual!=='')$('conditions').open=true;
 $('benchDate').value=state.benchDate;
 
 function prefillPick(){
