@@ -8,7 +8,8 @@ For example, 16:00 in Gran Canaria on 21 December matches London on 20 June at a
 
 - The sun's height above the horizon is computed with the NOAA solar position algorithm.
 - The app finds the times of day when the sun reaches the same height at the comparison place and date.
-- The UV figures are clear-sky estimates derived from sun height alone, assuming sea level and typical ozone. Cloud, haze, altitude and the real ozone column change the actual value.
+- The UV figures are clear-sky estimates derived from sun height alone, assuming sea level and typical ozone. Cloud, haze and the real ozone column change the actual value.
+- Optional altitude and snow adjustments (under "Altitude and snow") show a second, adjusted match below the main result. Altitude adds about 10% UV per 1,000 m (WHO) and is ignored below 500 m; with current location, the phone's GPS altitude is used unless a value is entered. Snow multiplies exposure by 1.5 to reflect reflection from fresh snow. Both are estimates; the main sun-height match is unchanged.
 
 ## Privacy
 

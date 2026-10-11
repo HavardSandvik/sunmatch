@@ -76,6 +76,19 @@ button{font:inherit;font-weight:700;font-size:16px;background:var(--ink);color:v
 :focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 .msg{color:var(--muted);font-size:15px;margin:10px 0 0;max-width:40ch}
 .note{font-size:14px;color:var(--muted);margin-top:34px;max-width:60ch}
+details.conditions{margin-top:18px;border-top:1px solid var(--grid)}
+details.conditions summary{cursor:pointer;font-weight:700;font-size:17px;padding:10px 0;list-style:none;display:flex;align-items:center;gap:10px;min-height:44px}
+details.conditions summary::-webkit-details-marker{display:none}
+details.conditions summary::before{content:"";flex:none;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+details.conditions[open] summary::before{transform:rotate(45deg)}
+.cond-state{font-weight:400;color:var(--muted);font-size:15px}
+label.check{flex-direction:row;align-items:center;align-self:end;gap:10px;font-size:16px;color:var(--ink);min-height:44px;cursor:pointer}
+label.check input{width:22px;height:22px;min-height:0;padding:0;margin:0;accent-color:var(--sun);flex:none}
+.hint{font-size:14px;color:var(--muted);margin:8px 0 4px;max-width:46ch}
+.adj{margin:14px 0 0;font-size:18px;line-height:1.4;max-width:34ch}
+.adj strong{font-variant-numeric:tabular-nums}
+.key.adjusted{border-top:2px dotted var(--sun)}
+@media (prefers-reduced-motion:reduce){details.conditions summary::before{transition:none}}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -90,6 +103,7 @@ button{font:inherit;font-weight:700;font-size:16px;background:var(--ink);color:v
     <p class="lead" id="lead">Finding the sun…</p>
     <p class="big display" id="big">--:--</p>
     <p class="alt" id="alt"></p>
+    <p class="adj" id="adj" hidden></p>
     <button id="locBtn" hidden>Use my location</button>
     <p class="msg" id="locMsg" hidden></p>
   </section>
@@ -112,6 +126,14 @@ button{font:inherit;font-weight:700;font-size:16px;background:var(--ink);color:v
     <label>Time<select id="timeMode"><option value="now">Now</option><option value="pick">Choose a time</option></select></label>
   </div>
   <label id="pickWrap" hidden>Local date and time<input type="datetime-local" id="pick"></label>
+  <details class="conditions" id="conditions">
+    <summary>Altitude and snow <span class="cond-state" id="condState">Off</span></summary>
+    <div class="row">
+      <label>Altitude in metres<input type="number" id="altInput" inputmode="numeric" min="0" max="9000" step="10" placeholder="Sea level"></label>
+      <label class="check"><input type="checkbox" id="snowInput">Snow on the ground</label>
+    </div>
+    <p class="hint" id="altHint"></p>
+  </details>
 
   <h2 class="display">Compare with</h2>
   <div class="row">
@@ -119,7 +141,7 @@ button{font:inherit;font-weight:700;font-size:16px;background:var(--ink);color:v
     <label>Date<input type="date" id="benchDate"></label>
   </div>
 
-  <p class="note">Matches the sun's height above the horizon, which drives UV strength. The UV figures are clear-sky estimates at sea level with typical ozone; cloud, haze and altitude change the real value.</p>
+  <p class="note">Matches the sun's height above the horizon, which drives UV strength. The UV figures are clear-sky estimates at sea level with typical ozone; cloud and haze lower the real value. Altitude adds about 10% per 1,000 m, and fresh snow can raise exposure by about half again through reflection. Both adjustments are estimates.</p>
   <p class="note" style="margin-top:12px">Place data © <a href="https://www.geonames.org/" style="color:inherit">GeoNames</a>, <a href="https://creativecommons.org/licenses/by/4.0/" style="color:inherit">CC BY 4.0</a>, filtered and adapted.</p>
 </main>
 
@@ -199,9 +221,9 @@ function crossings(pts,t){
 
 /* state */
 const KEY='sunmatch:v2';
-const state={benchId:'London|GB',benchDate:new Date().getFullYear()+'-06-20',hereId:'gps',now:true};
-try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');if(placeById(s.benchId||''))state.benchId=s.benchId;if(/^\d{4}-\d{2}-\d{2}$/.test(s.benchDate||''))state.benchDate=s.benchDate;if(s.hereId==='gps'||placeById(s.hereId||''))state.hereId=s.hereId}catch(e){}
-function save(){try{localStorage.setItem(KEY,JSON.stringify({benchId:state.benchId,benchDate:state.benchDate,hereId:state.hereId}))}catch(e){}}
+const state={benchId:'London|GB',benchDate:new Date().getFullYear()+'-06-20',hereId:'gps',now:true,altManual:'',snow:false};
+try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');if(placeById(s.benchId||''))state.benchId=s.benchId;if(/^\d{4}-\d{2}-\d{2}$/.test(s.benchDate||''))state.benchDate=s.benchDate;if(s.hereId==='gps'||placeById(s.hereId||''))state.hereId=s.hereId;if(typeof s.altManual==='string'&&/^\d{0,4}(\.\d+)?$/.test(s.altManual))state.altManual=s.altManual;state.snow=s.snow===true}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({benchId:state.benchId,benchDate:state.benchDate,hereId:state.hereId,altManual:state.altManual,snow:state.snow}))}catch(e){}}
 let gps=null,locating=false;
 // The tagline shows until a comparison has been displayed once; from the next visit on it stays hidden.
 let introSeen=false;try{introSeen=localStorage.getItem(KEY+':intro')==='1'}catch(err){}
@@ -218,10 +240,46 @@ function hereInstant(here){
   return localToUtc(here.tz,+v[1],+v[2],+v[3],+v[4],+v[5]);
 }
 
+/* conditions: altitude and snow */
+const ALT_PER_KM=0.10;   // UV rises roughly 10% per 1,000 m (WHO)
+const SNOW_FACTOR=1.5;   // fresh snow: effective exposure up by about half through reflection
+const ALT_MIN=500;       // below this the altitude effect is negligible and ignored
+function conditions(){
+  let alt=null,src='';
+  const m=parseFloat(state.altManual);
+  if(state.altManual!==''&&isFinite(m)){alt=Math.max(0,Math.min(9000,m));src='manual'}
+  else if(state.hereId==='gps'&&gps&&gps.alt!=null&&isFinite(gps.alt)){alt=Math.max(0,gps.alt);src='gps'}
+  const altOn=alt!=null&&alt>=ALT_MIN;
+  const factor=(altOn?1+ALT_PER_KM*alt/1000:1)*(state.snow?SNOW_FACTOR:1);
+  const altTxt=alt==null?'':`${(Math.round(alt/10)*10).toLocaleString('en-GB')} m`;
+  let phrase='',short='Off';
+  if(altOn&&state.snow){phrase=`At ${altTxt} with snow`;short=`${altTxt}, snow`}
+  else if(altOn){phrase=`At ${altTxt}`;short=altTxt}
+  else if(state.snow){phrase='With snow';short='Snow'}
+  return {alt,src,altOn,altTxt,factor,active:altOn||state.snow,phrase,short};
+}
+// Sun height that gives this clear-sky UV at sea level (inverse of uvi)
+function heightForUv(u){return u>=12.5?90:Math.asin(Math.pow(u/12.5,1/2.42))/R}
+function updateConditionsUI(c){
+  $('condState').textContent=c.short;
+  const inp=$('altInput');
+  if(document.activeElement!==inp&&inp.value!==state.altManual)inp.value=state.altManual;
+  $('snowInput').checked=state.snow;
+  const gpsAlt=state.hereId==='gps'&&gps&&gps.alt!=null&&isFinite(gps.alt);
+  inp.placeholder=gpsAlt?`${Math.round(gps.alt).toLocaleString('en-GB')} from phone`:'Sea level';
+  let h;
+  if(c.src==='gps')h=`Using your phone's altitude. Type a value to override it.`;
+  else if(c.src==='manual')h='';
+  else if(state.hereId==='gps')h=gps?`Your phone hasn't reported an altitude. Enter one to adjust.`:'';
+  else h='Enter the altitude of where you are.';
+  if(c.alt!=null&&!c.altOn)h=`Below ${ALT_MIN} m the effect is negligible, so altitude isn't adjusted.`;
+  $('altHint').textContent=h;$('altHint').hidden=!h;
+}
+
 /* chart */
-function chartSvg(bench,herePts,target,crosses,primary,nowMin){
+function chartSvg(bench,herePts,target,crosses,primary,nowMin,adj){
   const W=340,H=200,pl=34,pr=10,pt=12,pb=26;
-  let top=Math.max(...bench.map(p=>p.e),herePts?Math.max(...herePts.map(p=>p.e)):0,target||0);
+  let top=Math.max(...bench.map(p=>p.e),herePts?Math.max(...herePts.map(p=>p.e)):0,target||0,adj?adj.target:0);
   const ymax=Math.max(60,Math.ceil((top+4)/15)*15);
   const x=m=>pl+m/1440*(W-pl-pr),y=e=>pt+(1-e/ymax)*(H-pt-pb);
   const path=pts=>pts.map((p,i)=>(i?'L':'M')+x(p.m).toFixed(1)+' '+y(p.e).toFixed(1)).join('');
@@ -235,6 +293,10 @@ function chartSvg(bench,herePts,target,crosses,primary,nowMin){
     s+=`<line x1="${pl}" x2="${W-pr}" y1="${y(target)}" y2="${y(target)}" stroke="var(--sun)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
     if(nowMin!=null)s+=`<circle cx="${x(nowMin)}" cy="${y(target)}" r="4.5" fill="var(--surface)" stroke="var(--muted)" stroke-width="2"/>`;
     for(const c of crosses){s+=c===primary?`<circle cx="${x(c.m)}" cy="${y(target)}" r="6.5" fill="var(--sun)"/>`:`<circle cx="${x(c.m)}" cy="${y(target)}" r="5" fill="var(--surface)" stroke="var(--sun)" stroke-width="2.4"/>`}
+  }
+  if(adj&&adj.target>0){
+    s+=`<line x1="${pl}" x2="${W-pr}" y1="${y(adj.target)}" y2="${y(adj.target)}" stroke="var(--sun)" stroke-width="1.8" stroke-dasharray="1.5 3.5" stroke-linecap="round"/>`;
+    if(adj.primary)s+=`<rect x="${x(adj.primary.m)-5}" y="${y(adj.target)-5}" width="10" height="10" transform="rotate(45 ${x(adj.primary.m)} ${y(adj.target)})" fill="var(--sun)"/>`;
   }
   return s+'</svg>';
 }
@@ -254,6 +316,8 @@ function render(){
   $('sPeak').innerHTML=`${peak.e.toFixed(1)}° <small>at ${fmtMin(peak.m)}</small>`;
   $('uPeak').textContent=uvi(peak.e).toFixed(1);
 
+  const cond=conditions();updateConditionsUI(cond);
+  const adjEl=$('adj');adjEl.hidden=true;
   if(!here){
     lead.textContent=locating?'Finding your location…':`Share your location to compare the sun where you are with ${bName}.`;
     big.textContent='--:--';alt.textContent='';$('stats').hidden=true;
@@ -300,23 +364,36 @@ function render(){
     if(other){const part=other.rising?'morning':(other.m<17*60?'afternoon':'evening');alt.textContent=`or ${fmtMin(other.m)} in the ${part}`}
     else alt.textContent='';
   }
-  $('chart').innerHTML=chartSvg(bpts,hpts,e>0?e:null,crosses,primary,e>0?nowMin:null);
+  let adj=null;
+  if(e>0&&cond.active){
+    const u=uvi(e)*cond.factor,target=heightForUv(u);
+    const ac=target<=peak.e?crossings(bpts,target):[];
+    const ap=ac.find(c=>c.rising===rising)||ac[0]||null;
+    adj={target,primary:ap};
+    const uTxt=u.toFixed(1);
+    if(target>peak.e)adjEl.textContent=`${cond.phrase}, UV is about ${uTxt}: stronger than it ever gets in ${bName}.`;
+    else if(!ap)adjEl.textContent=`${cond.phrase}, UV is about ${uTxt}: still weaker than it ever gets in ${bName}.`;
+    else adjEl.innerHTML=`${esc(cond.phrase)} (UV about ${uTxt}), it's more like <strong>${fmtMin(ap.m)}</strong>.`;
+    adjEl.hidden=false;
+  }
+  $('chart').innerHTML=chartSvg(bpts,hpts,e>0?e:null,crosses,primary,e>0?nowMin:null,adj);
   const hereDay=state.now?'today':fmtDate(hp.year,hp.month,hp.day);
-  $('legend').innerHTML=`<span><i class="key"></i>${bName}</span><span><i class="key here"></i>${gpsMode?'Your location':here.name}, ${hereDay}</span>`+(e>0?`<span><i class="key target"></i>${state.now?'Sun height now':'Sun height at chosen time'}</span>`:'');
+  $('legend').innerHTML=`<span><i class="key"></i>${bName}</span><span><i class="key here"></i>${gpsMode?'Your location':here.name}, ${hereDay}</span>`+(e>0?`<span><i class="key target"></i>${state.now?'Sun height now':'Sun height at chosen time'}</span>`:'')+(adj?`<span><i class="key adjusted"></i>Adjusted for ${cond.altOn&&state.snow?'altitude and snow':cond.altOn?'altitude':'snow'}</span>`:'');
 }
 
 /* location */
-function locate(){
+function locate(high=true){
   const msg=$('locMsg');
   if(!navigator.geolocation){msg.hidden=false;msg.textContent='This browser cannot share location. Search for a place under Where you are instead.';return}
   locating=true;msg.hidden=true;render();
   navigator.geolocation.getCurrentPosition(p=>{
-    gps={lat:p.coords.latitude,lon:p.coords.longitude};locating=false;msg.hidden=true;render();
+    gps={lat:p.coords.latitude,lon:p.coords.longitude,alt:p.coords.altitude};locating=false;msg.hidden=true;render();
   },err=>{
+    if(high&&err.code!==1){locate(false);return}
     locating=false;msg.hidden=false;
     msg.textContent=err.code===1?'Location access is blocked. Allow it for this page in your browser settings, or search for a place under Where you are.':'Your location could not be found. Try again, or search for a place under Where you are.';
     render();
-  },{enableHighAccuracy:false,timeout:15000,maximumAge:600000});
+  },{enableHighAccuracy:high,timeout:high?20000:15000,maximumAge:300000});
 }
 
 /* controls */
@@ -352,7 +429,10 @@ function makeCombo(input,list,withGps,getId,setId){
 }
 function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 makeCombo($('benchInput'),$('benchList'),false,()=>state.benchId,id=>{state.benchId=id;save();render()});
-makeCombo($('hereInput'),$('hereList'),true,()=>state.hereId,id=>{state.hereId=id;save();if(id==='gps'&&!gps)locate();render()});
+makeCombo($('hereInput'),$('hereList'),true,()=>state.hereId,id=>{if(id!==state.hereId)state.altManual='';state.hereId=id;save();if(id==='gps'&&!gps)locate();render()});
+$('altInput').addEventListener('input',e=>{state.altManual=e.target.value.trim();save();render()});
+$('snowInput').addEventListener('change',e=>{state.snow=e.target.checked;save();render()});
+if(state.snow||state.altManual!=='')$('conditions').open=true;
 $('benchDate').value=state.benchDate;
 
 function prefillPick(){
@@ -362,7 +442,7 @@ function prefillPick(){
 $('benchDate').addEventListener('change',e=>{if(/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)){state.benchDate=e.target.value;save();render()}});
 $('timeMode').addEventListener('change',e=>{state.now=e.target.value==='now';$('pickWrap').hidden=state.now;if(!state.now&&!$('pick').value)prefillPick();render()});
 $('pick').addEventListener('input',render);
-$('locBtn').addEventListener('click',locate);
+$('locBtn').addEventListener('click',()=>locate());
 setInterval(()=>{if(state.now)render()},60000);
 
 if('serviceWorker' in navigator&&location.protocol==='https:'){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
