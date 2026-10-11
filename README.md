@@ -34,4 +34,4 @@ Once opened, the app works offline.
 
 ## Data
 
-Place data © [GeoNames](https://www.geonames.org/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). It is filtered to places with a population of at least 15,000, plus national capitals and a few hand-added islands, regions and towns. Time zones are derived from coordinates.
+Place data © [GeoNames](https://www.geonames.org/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). It is filtered to places with a population of at least 15,000, plus national capitals and a few hand-added islands, regions and towns. About 130 major ski resorts are added by hand, each with an approximate typical skiing altitude (halfway between the lowest and highest lifts), which the altitude adjustment uses automatically. Time zones are derived from coordinates.
