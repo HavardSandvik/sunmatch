@@ -88,6 +88,10 @@ details.conditions[open] summary::before{transform:rotate(45deg)}
 .adj strong{font-variant-numeric:tabular-nums}
 .key.adjusted{border-top:2px dotted var(--sun)}
 @media (prefers-reduced-motion:reduce){details.conditions summary::before{transition:none}}
+.setup{background:var(--surface);border-radius:16px;padding:18px 16px 20px;margin-top:4px}
+.setup h2{margin:0 0 6px}
+.setup p{margin:0 0 16px;max-width:40ch}
+.setup .hint{margin:12px 0 0}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -98,6 +102,18 @@ details.conditions[open] summary::before{transform:rotate(45deg)}
     <p class="tagline" id="tagline">How strong is the sun? Compare it with a place and date you know.</p>
   </header>
 
+  <section class="setup" id="setup" hidden>
+    <h2 class="display">Choose your reference</h2>
+    <p>Pick a place and date whose sun you know well, such as home in midsummer.</p>
+    <div class="row">
+      <div class="field"><label for="setupInput">Place</label><div class="combo"><input id="setupInput" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="setupList" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Search places"><ul id="setupList" role="listbox" hidden></ul></div></div>
+      <label>Date<input type="date" id="setupDate"></label>
+    </div>
+    <button id="setupBtn">Start comparing</button>
+    <p class="hint">You can change this later under Compare with.</p>
+  </section>
+
+  <div id="app">
   <section aria-live="polite">
     <p class="lead" id="lead">Finding the sun…</p>
     <p class="big display" id="big">--:--</p>
@@ -145,6 +161,8 @@ details.conditions[open] summary::before{transform:rotate(45deg)}
   <div class="row">
     <div class="field"><label for="benchInput">Place</label><div class="combo"><input id="benchInput" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="benchList" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Search places"><ul id="benchList" role="listbox" hidden></ul></div></div>
     <label>Date<input type="date" id="benchDate"></label>
+  </div>
+
   </div>
 
   <p class="note">Matches the sun's height above the horizon, which drives UV strength. The UV figures are clear-sky estimates at sea level with typical ozone; cloud and haze lower the real value. Altitude adds about 10% per 1,000 m. Reflection adds about 10% near water, 15% on sand and around half again on fresh snow. These adjustments are estimates.</p>
@@ -236,6 +254,7 @@ const SURFACES={
 };
 const state={benchId:'London|GB',benchDate:new Date().getFullYear()+'-06-20',hereId:'gps',now:true,altManual:'',surface:'none'};
 try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');if(placeById(s.benchId||''))state.benchId=s.benchId;if(/^\d{4}-\d{2}-\d{2}$/.test(s.benchDate||''))state.benchDate=s.benchDate;if(s.hereId==='gps'||placeById(s.hereId||''))state.hereId=s.hereId;if(typeof s.altManual==='string'&&/^\d{0,4}(\.\d+)?$/.test(s.altManual))state.altManual=s.altManual;if(SURFACES[s.surface])state.surface=s.surface;else if(s.snow===true)state.surface='snow'}catch(e){}
+let setupDone=false;try{setupDone=!!JSON.parse(localStorage.getItem(KEY)||'{}').benchId}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify({benchId:state.benchId,benchDate:state.benchDate,hereId:state.hereId,altManual:state.altManual,surface:state.surface}))}catch(e){}}
 let gps=null,locating=false;
 // The tagline shows until a comparison has been displayed once; from the next visit on it stays hidden.
@@ -443,7 +462,7 @@ function makeCombo(input,list,withGps,getId,setId){
   return {reset};
 }
 function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-makeCombo($('benchInput'),$('benchList'),false,()=>state.benchId,id=>{state.benchId=id;save();render()});
+const benchCombo=makeCombo($('benchInput'),$('benchList'),false,()=>state.benchId,id=>{state.benchId=id;save();render()});
 makeCombo($('hereInput'),$('hereList'),true,()=>state.hereId,id=>{if(id!==state.hereId)state.altManual='';state.hereId=id;save();if(id==='gps'&&!gps)locate();render()});
 $('altInput').addEventListener('input',e=>{state.altManual=e.target.value.trim();save();render()});
 $('surfaceInput').addEventListener('change',e=>{state.surface=e.target.value;save();render()});
@@ -461,14 +480,41 @@ $('locBtn').addEventListener('click',()=>locate());
 setInterval(()=>{if(state.now)render()},60000);
 
 if('serviceWorker' in navigator&&location.protocol==='https:'){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
-render();
-if(state.hereId==='gps'){
+function startLocation(){
+  if(state.hereId!=='gps')return;
   try{
     if(navigator.permissions&&navigator.permissions.query){
       navigator.permissions.query({name:'geolocation'}).then(r=>{if(r.state!=='denied')locate()}).catch(()=>locate());
     }else locate();
   }catch(e){locate()}
 }
+
+/* first run: choose the reference place and date */
+// Largest place whose clock currently matches the phone's
+function sameOffset(){const now=Date.now(),mine=offset(DEV_TZ,now),seen={};return PLACES.find(p=>(seen[p.tz]??=offset(p.tz,now))===mine)}
+function midsummer(p){return `${new Date().getFullYear()}-${p&&p.lat<0?'12':'06'}-20`}
+function setupFlow(){
+  // Suggest the largest place in the phone's time zone, falling back to London
+  // (zone names like Europe/Oslo usually name a city; the place data merges some zones, e.g. Oslo into Europe/Berlin)
+  const zoneCity=fold((DEV_TZ.split('/').pop()||'').replace(/_/g,' '));
+  const guess=(zoneCity&&PLACES.find(p=>p.k===zoneCity||p.k.startsWith(zoneCity+' ')))||PLACES.find(p=>p.tz===DEV_TZ)||(/^(UTC|Etc\/|GMT)/.test(DEV_TZ)?null:sameOffset())||placeById('London|GB');
+  let setupId=placeId(guess),dateTouched=false;
+  $('setupDate').value=midsummer(guess);
+  makeCombo($('setupInput'),$('setupList'),false,()=>setupId,id=>{setupId=id;if(!dateTouched)$('setupDate').value=midsummer(placeById(id))});
+  $('setupDate').addEventListener('change',()=>{dateTouched=true});
+  $('setup').hidden=false;$('app').hidden=true;
+  $('setupBtn').addEventListener('click',()=>{
+    state.benchId=setupId;
+    if(/^\d{4}-\d{2}-\d{2}$/.test($('setupDate').value))state.benchDate=$('setupDate').value;
+    setupDone=true;save();
+    benchCombo.reset();$('benchDate').value=state.benchDate;
+    $('setup').hidden=true;$('app').hidden=false;
+    render();startLocation();
+  });
+}
+
+render();
+if(setupDone)startLocation();else setupFlow();
 </script>
 </body>
 </html>
