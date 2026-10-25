@@ -229,9 +229,15 @@ function fmtMin(m){m=Math.min(1439,Math.max(0,Math.round(m)));return String(Math
 function fmtDate(y,mo,d){return new Date(Date.UTC(y,mo-1,d,12)).toLocaleDateString('en-GB',{day:'numeric',month:'long',timeZone:'UTC'})}
 function pad(n){return String(n).padStart(2,'0')}
 
+// Sun height through a local calendar day, indexed by local clock minute.
+// On days when the clocks change, each clock time is converted separately so the curve isn't shifted by an hour.
 function dayCurve(pl,y,mo,d){
-  const start=localToUtc(pl.tz,y,mo,d,0,0),pts=[];
-  for(let m=0;m<=1440;m+=2)pts.push({m,e:elevation(start+m*60000,pl.lat,pl.lon)});
+  const start=localToUtc(pl.tz,y,mo,d,0,0),end=localToUtc(pl.tz,y,mo,d,23,59),pts=[];
+  const steady=end-start===1439*60000;
+  for(let m=0;m<=1440;m+=2){
+    const t=steady?start+m*60000:localToUtc(pl.tz,y,mo,d,0,m);
+    pts.push({m,e:elevation(t,pl.lat,pl.lon)});
+  }
   return pts;
 }
 function crossings(pts,t){
