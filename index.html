@@ -348,8 +348,8 @@ function render(){
   const here=hereSpot();
   const lead=$('lead'),big=$('big'),alt=$('alt');
   $('locBtn').hidden=!(state.hereId==='gps'&&!gps);
-  $('sPeakLabel').textContent=`Peak sun height in ${bench.name}`;
-  $('uPeakLabel').textContent=`Peak UV in ${bench.name}`;
+  $('sPeakLabel').textContent=`Peak sun height in ${bench.name} on ${fmtDate(by,bm,bd)}`;
+  $('uPeakLabel').textContent=`Peak UV in ${bench.name} on ${fmtDate(by,bm,bd)}`;
   $('sPeak').innerHTML=`${peak.e.toFixed(1)}° <small>at ${fmtMin(peak.m)}</small>`;
   $('uPeak').textContent=uvi(peak.e).toFixed(1);
 
